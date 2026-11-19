@@ -2348,7 +2348,8 @@ function merchantStock() {
   return (mStockCache[key] = out);
 }
 function openMerchant() {
-  openModal({ title: '🦝 떠돌이 상인', tabs: [{ id: 'm', label: '이번 물건', render: body => {
+  openModal({ title: '떠돌이 상인', tabs: [{ id: 'm', label: '이번 물건', render: body => {
+    body.append(el('div', { style: 'display:flex;justify-content:center;margin-bottom:6px' }, sprThumb('merchant', 72)));
     const inf = merchantInfo(), hh = Math.floor(inf.left / 60), mm = inf.left % 60;
     body.append(el('p', { class: 'lead', text: '"이번에만 파는 귀한 물건이에요! 하루에 7번 물건을 바꾸니 자주 들러 줘요." 다음 물건까지 ' + (hh ? hh + '시간 ' : '') + mm + '분 남았어요. 지금 ' + fmtBell(me.bells) + ' 있어요.' }));
     body.append(el('div', { class: 'cards' }, merchantStock().map(({ k, price }) => { const it = ITEMS[k]; return card({ canvas: visual(k), title: it.name, badge: { text: fmtBell(price), cls: 'gold' }, text: it.type === 'furniture' ? '상인에게서만 살 수 있는 가구예요. 집 보관함으로 보내 드려요.' : '먹으면 기분이 반짝반짝해져요.',
@@ -2361,10 +2362,10 @@ function drawMerchant(now) {
   ctx.fillStyle = '#6b4a30'; ctx.fillRect(x - 5, y - 18, 3, 30); ctx.fillRect(x + T + 2, y - 18, 3, 30);
   for (let i = 0; i < 6; i++) { ctx.fillStyle = i % 2 ? '#ffffff' : '#e8736f'; ctx.fillRect(x - 8 + i * 8, y - 22, 8, 9); }
   ctx.font = '24px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillStyle = '#000000';
-  ctx.fillText('🦝', x + T / 2, y + 12 + Math.sin(now / 500) * 1.5);
+  drawSpr(ctx, 'merchant', x + T / 2, y + 16 + Math.sin(now / 500) * 1.5, 2);
   ctx.fillStyle = '#a0714a'; ctx.fillRect(x - 6, y + 10, T + 12, 18); ctx.fillStyle = '#8a5a3a'; ctx.fillRect(x - 6, y + 10, T + 12, 3);
   oval(ctx, x - 1, y + 29, 5, 5, 0, '#5a4030'); oval(ctx, x + T + 1, y + 29, 5, 5, 0, '#5a4030');
-  ctx.font = '10px sans-serif'; merchantStock().slice(0, 3).forEach((o, i) => ctx.fillText(ITEMS[o.k].icon, x + 4 + i * 12, y + 23));
+  [['#e8736f', '#b84a46'], ['#86bdea', '#4f86c4'], ['#f2c44a', '#c99a2a']].forEach(([a1, a2], i) => { const bx = x - 2 + i * 13, by = y + 16; ctx.fillStyle = '#3a2e2a'; ctx.fillRect(bx - 1, by - 1, 12, 10); ctx.fillStyle = a1; ctx.fillRect(bx, by, 10, 8); ctx.fillStyle = a2; ctx.fillRect(bx, by + 3, 10, 2); ctx.fillStyle = '#fff6b0'; ctx.fillRect(bx + 4, by, 2, 8); });
   pill('떠돌이 상인', x + T / 2, y - 30, '#fff3c4', '#5a4310', '11px Jua, sans-serif');
 }
 
@@ -2408,17 +2409,16 @@ function updateWild(dt, now) {
 function drawWild(a, now) {
   const A = ANIMALS[a.k], mv = Math.hypot(a.vx, a.vy) > 1, hop = mv ? Math.abs(Math.sin(now / 120)) * 3 : 0;
   shadow(a.x, a.y, 9);
-  ctx.save(); ctx.translate(a.x, a.y - hop); if (a.face > 0) ctx.scale(-1, 1);
-  ctx.font = '24px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillStyle = '#000000'; ctx.fillText(A.icon, 0, 3);
-  ctx.restore();
+  drawSpr(ctx, 'an_' + a.k, a.x, a.y + 3 - hop, 2, a.face > 0);
   const ht = (now - a.heartT) / 1400;
-  if (ht >= 0 && ht < 1) { ctx.globalAlpha = 1 - ht; ctx.font = '14px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillText('💕', a.x, a.y - 26 - ht * 16); ctx.globalAlpha = 1; }
+  if (ht >= 0 && ht < 1) { ctx.globalAlpha = 1 - ht; drawSprC(ctx, 'fx_heart', a.x - 5, a.y - 34 - ht * 16, 2, '#ff7aa2'); drawSprC(ctx, 'fx_heart', a.x + 6, a.y - 40 - ht * 18, 1, '#ff9ebb'); ctx.globalAlpha = 1; }
 }
 function gainAnimal(k, n) { me.log.animals[k] = (me.log.animals[k] || 0) + n; }
 function openAnimal(a) {
   const A = ANIMALS[a.k]; a.vx = 0; a.vy = 0; a.nextT = performance.now() + 5000;
-  openModal({ title: A.icon + ' ' + A.name, tabs: [{ id: 'a', label: '함께 놀기', render: body => {
+  openModal({ title: A.name, tabs: [{ id: 'a', label: '함께 놀기', render: body => {
     const fr = me.log.animals[a.k] || 0, hearts = Math.min(10, Math.floor(fr / 3));
+    body.append(el('div', { style: 'display:flex;justify-content:center;margin-bottom:6px' }, sprThumb('an_' + a.k, 72)));
     body.append(el('p', { class: 'lead', text: '친밀도 ' + '♥'.repeat(hearts) + '♡'.repeat(10 - hearts) + ' (' + fr + '점). 좋아하는 간식을 주면 친해지고, 가끔 답례로 선물을 물어다 줘요.' }));
     body.append(el('div', { class: 'inline' }, el('button', { class: 'primary', disabled: a.petted, onclick: () => { a.petted = true; a.heartT = performance.now(); gainAnimal(a.k, 1); markDirty(); toast(josa(A.name, '을', '를') + ' 쓰다듬었어요. ' + A.say, 'good'); modal.render(); } }, a.petted ? '이미 쓰다듬었어요' : '쓰다듬기')));
     const foods = A.likes.filter(k => me.bag[k] > 0);
@@ -2431,11 +2431,102 @@ function feedAnimal(a, k) {
   const A = ANIMALS[a.k]; if (!(me.bag[k] > 0)) return;
   addItem(k, -1); a.heartT = performance.now(); a.tameUntil = performance.now() + 25000;
   const before = me.log.animals[a.k] || 0, pts = k === A.fav ? 5 : 3; gainAnimal(a.k, pts);
-  let msg = a.k === 'cat' && k === 'churu' ? '츄르를 주자 고양이가 냠냠 핥아 먹고 골골송을 불러요 😻' : josa(ITEMS[k].name, '을', '를') + ' 줬어요. ' + josa(A.name, '이', '가') + ' ' + A.say;
+  let msg = a.k === 'cat' && k === 'churu' ? '츄르를 주자 고양이가 냠냠 핥아 먹고 골골송을 불러요' : josa(ITEMS[k].name, '을', '를') + ' 줬어요. ' + josa(A.name, '이', '가') + ' ' + A.say;
   if (Math.random() < .3) { const b = 100 * (1 + Math.floor(Math.random() * 5)); me.bells += b; msg += ' 답례로 ' + fmtBell(b) + '을 물어다 줬어요!'; }
   if (Math.floor(before / 30) < Math.floor((before + pts) / 30)) { const fk = FURN_KEYS[Math.floor(Math.random() * FURN_KEYS.length)]; me.storage[fk] = (me.storage[fk] || 0) + 1; msg += ' 친해진 기념으로 ' + josa(ITEMS[fk].name, '을', '를') + ' 받았어요 (집 보관함)!'; }
   markDirty(); doEmote(0); toast(msg, 'good'); modal.render();
 }
+
+/* 픽셀 스프라이트 */
+const PXS = {
+  an_cat: ["k#3a2e2a o#f2b36b d#d98a3f w#fff6ea p#f48fb1 e#2b2b2b", "..............|.k...k........|kok.kok.......|koookook....k.|kooooook...kok|koeooeok...kok|kowpwwok...kok|.kwwwwok..kdk.|..koooodooodk.|..koododododk.|..kooooooook..|..kok.kk.kok..|..kk..kk..kk.."],
+  an_dog: ["k#3a2e2a o#d9a46b d#9b6a42 w#fff1dd e#2b2b2b n#2b2b2b t#e8736f", "................|..kk.....kk.....|.kddk...kddk....|.kddookooddk....|..kooooooook....|..koeooooeok...k|..kowwnnwwok.kdk|...kwwttwwk..kdk|....kooook..kok.|...kooooooookok.|...koooooooook..|...koowooowook..|...kok.k..kok...|...kk..k..kk...."],
+  an_rabbit: ["k#3a2e2a o#f4efe8 g#d9d0c4 p#f6a9bd e#2b2b2b", "..kk.kk.......|.kpok.pk......|.kpok.pk......|.kpok.pk......|.kooooook.....|kooooooook....|koeooooook....|koooopoook.kk.|.kooooooookook|..kooooooooook|..koooggoooook|...kooooooook.|...kok..kok...|....k....k...."],
+  an_squirrel: ["k#3a2e2a o#c9763a l#f2c79a e#2b2b2b t#a85d2a", "..k.k...kkkk..|.kokok.kttttk.|.kooook.kttttk|koeoook.kttttk|kooooook.kttk.|.kllook.kttk..|..kllookttk...|..klloooook...|..kllooooook..|...kloooooook.|....kokkkok...|....kk...kk..."],
+  an_duck: ["k#3a2e2a w#ffffff g#e3e3e3 y#ffb84d e#2b2b2b", "....kkk.......|...kwwwk......|..kwewwk......|kyywwwwk......|kyykwwk.......|.kkkwwk...k...|...kwwwkkkwk..|..kwwwwwwwwwk.|..kwwggggwwwk.|..kwwwggwwwk..|...kwwwwwwk...|....kykkyk....|....kk..kk...."],
+  an_deer: ["k#3a2e2a o#c98a55 w#fff3e3 d#8a5a3a e#2b2b2b n#2b2b2b", "kd.dk...........|.kdk.dk.........|..kddk..........|..kook..........|.koooook........|kneooook........|knoooook........|.kkkooook.......|....kooookkkkkk.|....kowooowoowok|....kooooooooook|....kowoowoooowk|.....kooooooook.|.....kok.k..kok.|.....kok.k..kok.|.....kk..k..kk.."],
+  merchant: ["k#3a2e2a g#9a9aa6 d#5b5b68 w#f4f1ea e#1f1f1f n#2b2b2b h#c9763a b#e8c25a", "...kkkkkkkk...|..khhhhhhhhk..|.kkkkkkkkkkkk.|..kgk....kgk..|.kggggggggggk.|kgddddggddddgk|kgdedwggwdedgk|kgdddwwwwdddgk|.kgwwwnnwwwgk.|..kgwwwwwwgk..|...kkggggkk...|..kbbbbbbbbk..|.kgbbbbbbbbgk.|.kgbbbbbbbbgk."],
+  pet_dog: ["k#3a2e2a o#d9a46b d#9b6a42 w#fff1dd e#2b2b2b t#e8736f n#2b2b2b", ".kk.....kk.|kddkkkkkddk|kddooooodk.|.koeoooeok.|.kowwnwwok.|..kwwtwwk..|.kooooooook|.kowoooowok|..kk...kk.."],
+  pet_cat: ["k#3a2e2a o#bfbfc8 d#8a8a96 w#ffffff e#2b2b2b p#f48fb1", "k.......k..|kok...kok..|koookoook..|kodooodok..|koeoooeok..|kowwpwwok..|.kooooook..|.koooooookk|.kowooowokk|..kk..kk..."],
+  pet_chick: ["k#3a2e2a y#ffd84d o#ffb84d e#2b2b2b p#f6a9bd", "...kk....|..kyyk...|.kyyyyk..|kyeyyeyk.|kypooyyk.|kyyooyyyk|kyyyyyyyk|.kyyyyyk.|..kokok..|..kk.kk.."],
+  pet_bunny: ["k#3a2e2a o#ffffff p#f6a9bd e#2b2b2b g#e6e0d8", ".kk..kk..|.kpk.kpk.|.kpk.kpk.|kooooook.|koeooeok.|kopoopok.|koooooook|.kgooogk.|..kk.kk.."],
+  pet_ghost: ["k#3a2e2a w#ffffff g#dfe6f2 e#2b2b2b p#f6a9bd", "..kkkk..|.kwwwwk.|kwwwwwwk|kweewewk|kwpwwpwk|kwwwwwwk|kwwwwwgk|kwkwkwkk|kk.k.k.."],
+  pet_dino: ["k#3a2e2a g#7fd68a d#4fa860 w#ffffff e#2b2b2b y#f2e9a0", "..kkkk.....|.kggggk....|kgegggk....|kggggggk...|kgwkwggk.k.|.kkkggggkdk|...kgygggdk|...kgyggggk|...kgggggk.|...kgk.kgk.|...kk..kk.."],
+  pet_panda: ["k#3a2e2a w#ffffff b#2b2b2b p#f6a9bd", "kk....kk|kbkkkkbk|kwwwwwwk|kbbwwbbk|kbwwwbwk|kwwbbwwk|.kwwwwk.|kbwwwwbk|kbwwwwbk|.kk..kk."],
+  pet_fox: ["k#3a2e2a o#f08a3c w#fff6ea e#2b2b2b d#c9632a n#2b2b2b", "k......k....|kok..kok....|koookooook..|koeooooeok..|.kwwnwwwk...|..kwwwwk.k..|.koooooookok|.koooooookwk|..kk..kk.kk."],
+  pet_penguin: ["k#3a2e2a b#3a4a6b w#ffffff e#2b2b2b y#ffb84d", "..kkkk..|.kbbbbk.|kbweewbk|kbwyywbk|kbwwwwbk|kbwwwwbk|kbwwwwbk|.kbwwbk.|..yk.ky."],
+  pet_turtle: ["k#3a2e2a g#7fd68a s#a0714a d#7a5236 e#2b2b2b", "....kkkk....|...kssdsk...|..ksdsssdk..|kkksssssssk.|kgekddsddsk.|kggkssdsssk.|.kkkkkkkkkkk|..kgk...kgk.|..kk....kk.."],
+  pet_hedgehog: ["k#3a2e2a b#8a6a4a d#6b4a30 o#f2d0a4 e#2b2b2b p#f6a9bd n#2b2b2b", "...kkkkk...|..kbdbdbk..|.kdbdbdbdk.|kbdbdbdbdbk|kooeoooeook|koooonoooko|.kooopooook|..kkk.kkkk."],
+  pet_dragon: ["k#3a2e2a r#e8736f d#b84a46 y#ffd84d w#ffffff e#2b2b2b v#c3a6ec", "..y....y...|..kk..kk...|.krrrrrrk..|kreerreerk.|krrrrrrrrkk|.krwwwwrkvk|kvkrrrrkvvk|kvkryyrkvk.|.kkryyrk...|..krrrrk.k.|..kk..kkdk.|.........k."],
+  hat_ribbon: ["k#3a2e2a r#f06292 d#c2185b", "kk....kk|krrkkrrk|krrddrrk|krrkkrrk|kk....kk"],
+  hat_straw: ["k#3a2e2a y#f2d27a d#d9b35a r#e8736f", "....kkkkkk....|...kyyyyyyk...|...kyyyyyyk...|..krrrrrrrrk..|kkkyyyyyyyykkk|kyyyddyyddyyyk|.kkkkkkkkkkkk."],
+  hat_crown: ["k#3a2e2a y#ffd84d d#e0a92a r#e8473f b#5fb7ea", "k...k...k.|kk.kyk.kk.|kykkykkyk.|kyyyyyyyk.|kyrybyryk.|kddddddddk|.kkkkkkkk."],
+  hat_top: ["k#3a2e2a b#2f2f3a r#e8473f", "...kkkkkk...|...kbbbbk...|...kbbbbk...|...kbbbbk...|...krrrrk...|kkkkkkkkkkkk|kbbbbbbbbbbk|kkkkkkkkkkkk"],
+  hat_cap: ["k#3a2e2a b#5fb7ea w#ffffff d#3b8fc4", "...kkkkkk....|..kbbbbbbk...|.kbbbwwbbbk..|.kbbbbbbbbk..|.kddddddddddk|..kkkkkkkkkk."],
+  hat_flower: ["k#3a2e2a p#ffb3c8 y#ffd84d", ".kpk.|kpppk|ppypp|kpppk|.kpk."],
+  hat_phones: ["k#3a2e2a g#5b5b68 r#ff7aa2 l#9a9aa6", "...kkkkkkkk...|..kllllllllk..|.kl........lk.|kk..........kk|kr..........rk|kr..........rk|kk..........kk"],
+  hat_star: ["k#3a2e2a y#ffd84d p#f48fb1", "......k.......|.....kyk......|...kkyyykk....|....kyyyk.....|....kykyk.....|kpppppppppppk."],
+  hat_grad: ["k#3a2e2a b#2f2f3a y#ffd84d", "......kk......|...kkkbbkkk...|kkkbbbbbbbbkkk|..kkkbbbbkkkyk|...kbbbbbbk.yk|...kkkkkkkk.y."],
+  hat_helmet: ["k#3a2e2a w#ffffff r#e8473f g#dddddd", "...kkkkkk...|..kwwrrwwk..|.kwwrrrrwwk.|.kwwwrrwwwk.|kggggggggggk|.kkkkkkkkkk."],
+  hat_daisy: ["k#3a2e2a w#ffffff y#ffc93c", ".kwk.|kwwwk|wwyww|kwwwk|.kwk."],
+  hat_clover: ["k#3a2e2a g#5fae66 d#3f8a4a", ".kk.kk.|kggkggk|kgggggk|.kgdgk.|kgggggk|kggkggk|.kk.kdk|......k"],
+  hat_berry: ["k#3a2e2a r#e8473f g#5fae66 y#fff27a", ".kgk.|kgggk|krrrk|kryrk|krrrk|.kyk.|..k.."],
+  hat_pumpkin: ["k#3a2e2a o#f08a3c d#c9632a g#5fae66", ".....kgk.....|....kgk......|..kkkkkkkk...|.koodooodook.|koooddoooddok|kooodooodook.|.kkkkkkkkkk.."],
+  hat_butterfly: ["k#3a2e2a p#b9a2e3 y#ffd84d b#2f2f3a", "kk...kk|kppkppk|kpybypk|.kpbpk.|kppbppk|.kk.kk."],
+  hand_balloon: ["k#3a2e2a r#ff6b8b w#ffffff s#7a6a60", ".kkk.|krwrk|krrrk|krrrk|.krk.|..k..|..s..|.s...|..s..|..s.."],
+  hand_flower: ["k#3a2e2a p#ff9ebb y#ffd84d w#ffffff g#5fae66 r#e8473f", ".kpkwk.|kpypwyk|krkpkwk|kryrgk.|.kgggk.|..kgk..|..kgk.."],
+  hand_coffee: ["k#3a2e2a w#ffffff b#a0714a g#5b5b68", "kkkkk|kgggk|kwwwk|kbbbk|kwwwk|.kkk."],
+  hand_umbrella: ["k#3a2e2a b#5fb7ea w#ffffff s#7a6a60", "..kkkkk..|.kbwbwbk.|kbwbwbwbk|kkkkskkkk|....s....|....s....|....s....|..s.s....|...s....."],
+  hand_icecream: ["k#3a2e2a p#ffb3c8 w#fff6ea c#d9a46b d#b58250 r#e8473f", "..k..|.krk.|kpppk|kwwwk|kcdck|.kck.|..k.."],
+  hand_mic: ["k#3a2e2a g#9a9aa6 d#5b5b68 b#2f2f3a", ".kkk.|kgdgk|kdgdk|.kkk.|..b..|..b..|..b.."],
+  hand_sparkler: ["k#3a2e2a y#ffd84d o#ff9a4d w#ffffff s#7a6a60", "y.o.y|.ywy.|owwwo|.ywy.|y.s.y|..s..|..s..|..s.."],
+  fx_sparkle: ["x#ff7aa2", "..x..|..x..|xxxxx|..x..|..x.."],
+  fx_heart: ["x#ff7aa2", ".x.x.|xxxxx|xxxxx|.xxx.|..x.."],
+  fx_note: ["x#ff7aa2", "..xx.|..x.x|..x..|xxx..|xx..."],
+  fx_petal: ["x#ff7aa2", ".xx..|xxxx.|.xxxx|..xx."],
+  fx_snow: ["x#ff7aa2", "x.x.x|.xxx.|xxxxx|.xxx.|x.x.x"],
+  fx_star: ["x#ff7aa2", "..x..|.xxx.|xxxxx|.xxx.|x...x"],
+  fx_bubble: ["x#ff7aa2", ".xxx.|x...x|x.x.x|x...x|.xxx."],
+  fx_leaf: ["x#ff7aa2", ".xx..|xxxx.|xxxxx|.xxxx|...x."]
+};
+const sprCache = {};
+function sprImg(k, tint) {
+  const ck = k + '|' + (tint || '');
+  if (sprCache[ck]) return sprCache[ck];
+  const d = PXS[k]; if (!d) return null;
+  const P = {}; d[0].split(' ').forEach(t => { P[t[0]] = t.slice(1); });
+  const R = d[1].split('|'), w = R[0].length, h = R.length;
+  const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+  const c = cv.getContext('2d');
+  R.forEach((r, y) => { for (let x = 0; x < r.length; x++) { const ch = r[x]; if (ch === '.') continue; c.fillStyle = tint && ch === 'x' ? tint : (P[ch] || '#000000'); c.fillRect(x, y, 1, 1); } });
+  return (sprCache[ck] = cv);
+}
+function drawSpr(c, k, x, y, sc = 2, flip = false, tint) {
+  const im = sprImg(k, tint); if (!im) return;
+  const w = im.width * sc, h = im.height * sc;
+  c.save(); c.imageSmoothingEnabled = false; c.translate(Math.round(x), Math.round(y)); if (flip) c.scale(-1, 1);
+  c.drawImage(im, -Math.round(w / 2), -h, w, h); c.restore();
+}
+function drawSprC(c, k, x, y, sc = 2, tint) { const im = sprImg(k, tint); if (!im) return; drawSpr(c, k, x, y + im.height * sc / 2, sc, false, tint); }
+function sprThumb(k, size = 44, tint) {
+  const cv = el('canvas', { width: size, height: size, 'aria-hidden': 'true', style: 'width:' + size + 'px;height:' + size + 'px;image-rendering:pixelated;flex:0 0 auto' });
+  const im = sprImg(k, tint); if (!im) return cv;
+  const c = cv.getContext('2d'), sc = Math.max(1, Math.floor(Math.min((size - 4) / im.width, (size - 4) / im.height)));
+  drawSpr(c, k, size / 2, (size + im.height * sc) / 2, sc, false, tint);
+  return cv;
+}
+function accThumb(k) {
+  const it = ACC[k]; if (!it) return sprThumb(k);
+  if (it.slot === 'fx') return sprThumb(k, 44, it.col);
+  if (it.slot === 'face' || it.slot === 'back') {
+    const cv = el('canvas', { width: 44, height: 48, 'aria-hidden': 'true', style: 'flex:0 0 auto;image-rendering:pixelated' }), c = cv.getContext('2d');
+    c.imageSmoothingEnabled = false; c.translate(22, 26);
+    drawBody(c, me ? me.px : DEFAULT_PX_SAFE(), it.slot === 'back' ? 1 : 0, 0, it.slot === 'face' ? { f: k } : { b: k });
+    return cv;
+  }
+  return sprThumb(k);
+}
+function DEFAULT_PX_SAFE() { return validPx(''); }
 
 /* 곤충 */
 let nightFlag = false;
@@ -3394,8 +3485,8 @@ function accTab(body) {
     const c = pv.getContext('2d'), v = view();
     c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, 170, 190); c.imageSmoothingEnabled = false;
     c.save(); c.translate(85, 120); c.scale(2.6, 2.6); drawBody(c, me.px, 0, 0, v); c.restore();
-    if (v.x && ACC[v.x]) { const fx = ACC[v.x]; c.font = '18px sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillStyle = fx.col; for (let i = 0; i < 3; i++) { const an = now / 700 + i * 2.09; c.globalAlpha = .6 + .4 * Math.sin(now / 300 + i); c.fillText(fx.icon, 85 + Math.cos(an) * 56, 92 + Math.sin(an) * 40); } c.globalAlpha = 1; }
-    if (v.p && ACC[v.p]) { c.font = '32px sans-serif'; c.textAlign = 'center'; c.textBaseline = 'bottom'; c.fillText(ACC[v.p].icon, 142, 184 - Math.abs(Math.sin(now / 180)) * 4); }
+    if (v.x && ACC[v.x]) { const fx = ACC[v.x]; for (let i = 0; i < 3; i++) { const an = now / 700 + i * 2.09; c.globalAlpha = .6 + .4 * Math.sin(now / 300 + i); drawSprC(c, v.x, 85 + Math.cos(an) * 56, 92 + Math.sin(an) * 40, 3, fx.col); } c.globalAlpha = 1; }
+    if (v.p && ACC[v.p]) drawSpr(c, v.p, 142, 184 - Math.abs(Math.sin(now / 180)) * 4, 3);
     raf = requestAnimationFrame(draw);
   };
   raf = requestAnimationFrame(draw);
@@ -3414,7 +3505,7 @@ function accTab(body) {
       ? [el('button', { class: on ? '' : 'primary', onclick: () => { a[accSlot] = on ? '' : k; delete accTry[accSlot]; markDirty(); modal.render(); } }, on ? '벗기' : '착용하기')]
       : [el('button', { onclick: () => { if (trying) delete accTry[accSlot]; else accTry[accSlot] = k; modal.render(); } }, trying ? '벗어보기' : '입어보기'),
          el('button', { class: 'bell', disabled: me.bells < it.price, onclick: () => { if (me.bells < it.price) return; me.bells -= it.price; a.own.push(k); a[accSlot] = k; delete accTry[accSlot]; markDirty(); toast(josa(it.name, '을', '를') + ' 샀어요', 'good'); modal.render(); } }, '사기')];
-    return card({ icon: it.icon, title: it.name, badge: own ? { text: on ? '착용 중' : '가지고 있어요' } : { text: fmtBell(it.price), cls: 'gold' }, actions: acts });
+    return card({ canvas: accThumb(k), title: it.name, badge: own ? { text: on ? '착용 중' : '가지고 있어요' } : { text: fmtBell(it.price), cls: 'gold' }, actions: acts });
   })));
   return () => cancelAnimationFrame(raf);
 }
@@ -5071,8 +5162,8 @@ function openMenu(which) {
       card({ icon: '🚗', title: '자동차', text: '상점에서 사고 C로 타고 내려요. H는 경적이에요. 색은 꾸밈방 차고에서 무료로 바꿔요.' }),
       card({ icon: '🤝', title: '친구', text: '친구 옆에서 E를 누르면 인사, 하트, 집 놀러가기, 결투 신청을 할 수 있어요.' }),
       card({ icon: '🌦️', title: '시간과 날씨', text: '마을 시간은 실제 한국 시간과 같아요. 아침, 낮, 저녁 노을, 밤이 바뀌고, 밤에는 반딧불이가 날아다니고 집과 건물에 불이 켜져요. 날씨는 두 시간마다 바뀌어 비나 눈이 오기도 해요.' }),
-      card({ icon: '🦝', title: '떠돌이 상인', text: '광장 분수 왼쪽 아래의 상인 너구리가 하루에 7번 물건을 바꿔 가며 상점에 없는 귀한 가구를 팔아요.' }),
-      card({ icon: '🐈', title: '야생동물', text: '마을을 돌아다니는 고양이, 강아지, 토끼, 다람쥐, 오리, 사슴에게 E로 말을 걸어 쓰다듬거나 간식을 줘요. 고양이는 츄르를 제일 좋아해요. 간식은 상점 간식 칸에서 팔아요. 뛰어가면 놀라서 도망가요.' }),
+      card({ canvas: sprThumb('merchant'), title: '떠돌이 상인', text: '광장 분수 왼쪽 아래의 상인 너구리가 하루에 7번 물건을 바꿔 가며 상점에 없는 귀한 가구를 팔아요.' }),
+      card({ canvas: sprThumb('an_cat'), title: '야생동물', text: '마을을 돌아다니는 고양이, 강아지, 토끼, 다람쥐, 오리, 사슴에게 E로 말을 걸어 쓰다듬거나 간식을 줘요. 고양이는 츄르를 제일 좋아해요. 간식은 상점 간식 칸에서 팔아요. 뛰어가면 놀라서 도망가요.' }),
       card({ icon: '🎁', title: '선물', text: '친구에게 말을 걸어 선물하기를 누르면 벨이나 물건을 바로 줄 수 있어요. 친구 집에 놀러 가서 선물 두고 가기를 누르면, 주인이 집에 들어왔을 때 상자를 열어 봐요.' }),
       card({ icon: '🛸', title: '하늘을 나는 탈것', text: '상점 탈것 칸에서 마법 빗자루, 열기구, 경비행기, UFO를 사면 C로 타고 물과 건물 위를 날아다녀요. 빈 땅이나 물 위에서만 내릴 수 있어요.' }),
       card({ icon: '👹', title: '악당 퇴치', text: '매시 30분이 되면 ' + '심술 도깨비가 8분 동안 나타나요. 마을 사람들이 함께 F 키(휴대폰은 A 버튼)로 공격해서 물리치면, 공격에 참여한 사람 모두 벨과 능력치를 받아요. 바닥의 빨간 원은 공격 예고라 피해야 해요.' }),
@@ -5620,9 +5711,8 @@ function drawBody(c, px, dir, frame, acc) {
   if (back && dir === 1) drawBackItem(c, back, dir);
   if (!acc) return;
   if (acc.f && ACC[acc.f]) drawFaceItem(c, acc.f, dir, clamp(acc.fy || 0, -8, 8));
-  c.fillStyle = '#000000'; c.textAlign = 'center'; c.textBaseline = 'middle';
-  if (acc.h && ACC[acc.h]) { const sx = dir === 2 ? -2 : dir === 3 ? 2 : 0; c.font = '15px sans-serif'; c.fillText(ACC[acc.h].icon, sx, -17 + clamp(acc.hy || 0, -8, 8)); }
-  if (acc.d && ACC[acc.d] && dir !== 1) { c.font = '13px sans-serif'; c.fillText(ACC[acc.d].icon, dir === 2 ? -15 : 15, 5); }
+  if (acc.h && ACC[acc.h]) { const sx = dir === 2 ? -2 : dir === 3 ? 2 : 0; drawSpr(c, acc.h, sx, -12 + clamp(acc.hy || 0, -8, 8), 2); }
+  if (acc.d && ACC[acc.d] && dir !== 1) drawSprC(c, acc.d, dir === 2 ? -15 : 15, 5, 2);
 }
 function drawWeapon(c, job, dir, since) {
   const sw = since < 220 ? since / 220 : 1, side = dir === 2 ? -1 : 1;
@@ -5671,8 +5761,7 @@ function updPet(c, dt) {
 function drawPet(c, now) {
   const p = c.pet; if (!p || !c.acc || !ACC[c.acc.p]) return;
   shadow(p.x, p.y, 7);
-  ctx.font = '18px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillStyle = '#000000';
-  ctx.fillText(ACC[c.acc.p].icon, p.x, p.y + 2 - Math.abs(Math.sin(now / 180)) * 3);
+  drawSpr(ctx, c.acc.p, p.x, p.y + 2 - Math.abs(Math.sin(now / 180)) * 3, 2, c.d === 3);
 }
 function drawProj(p) {
   if (p.kind === 'arrow') {
@@ -5741,8 +5830,7 @@ function drawOverlay(c, now, isMe) {
   const top = Y - 42 - z;
   if (c.acc && c.acc.x && ACC[c.acc.x] && !c.at) {
     const fx = ACC[c.acc.x];
-    ctx.font = '11px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = fx.col;
-    for (let i = 0; i < 3; i++) { const an = now / 700 + i * 2.09; ctx.globalAlpha = .55 + .45 * Math.sin(now / 300 + i); ctx.fillText(fx.icon, X + Math.cos(an) * 20, Y - 22 - z + Math.sin(an) * 12); }
+    for (let i = 0; i < 3; i++) { const an = now / 700 + i * 2.09; ctx.globalAlpha = .55 + .45 * Math.sin(now / 300 + i); drawSprC(ctx, c.acc.x, X + Math.cos(an) * 20, Y - 22 - z + Math.sin(an) * 12, 2, fx.col); }
     ctx.globalAlpha = 1;
   }
   const tagC = c.acc && c.acc.t;

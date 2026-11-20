@@ -276,6 +276,8 @@ body.touch:not(.pad-mode) #pad{display:none}
 body.touch:not(.pad-mode) #joy{display:block;position:fixed;left:16px;bottom:calc(env(safe-area-inset-bottom,0px) + 92px);width:140px;height:140px;border-radius:50%;background:rgba(255,255,255,.45);border:3px solid rgba(47,74,58,.45);z-index:11;touch-action:none}
 #joyKnob{position:absolute;left:50%;top:50%;width:60px;height:60px;margin:-30px 0 0 -30px;border-radius:50%;background:#5fc4a0;border:3px solid #2f4a3a;box-shadow:0 3px 0 rgba(0,0,0,.25);pointer-events:none}
 body.touch #padToggle{display:block;position:fixed;left:16px;bottom:calc(env(safe-area-inset-bottom,0px) + 244px);font-size:12px;padding:4px 10px;z-index:11;opacity:.92}
+
+img.pxe{height:1.2em;width:auto;vertical-align:-0.22em;image-rendering:pixelated;display:inline-block;margin:0 .04em;pointer-events:none}
 </style>
 </head>
 <body>
@@ -577,6 +579,80 @@ body.touch #padToggle{display:block;position:fixed;left:16px;bottom:calc(env(saf
 </script>
 <script>
 (() => {
+
+/* 모든 이모지를 픽셀 그림으로 바꿔 그리기 */
+const EMO_SRC = '(?:\\p{Extended_Pictographic}|\\p{Regional_Indicator})(?:\\uFE0F|\\u20E3|[\\u{1F3FB}-\\u{1F3FF}])*(?:\\u200D\\p{Extended_Pictographic}(?:\\uFE0F|[\\u{1F3FB}-\\u{1F3FF}])*)*';
+const EMO_TEST = new RegExp(EMO_SRC, 'u'), EMO_RE_G = new RegExp(EMO_SRC, 'gu');
+const _fillText = CanvasRenderingContext2D.prototype.fillText, _strokeText = CanvasRenderingContext2D.prototype.strokeText;
+const pxEmoCache = new Map();
+function pxEmoji(e, n) {
+  const key = e + '|' + n; let cv = pxEmoCache.get(key); if (cv) return cv;
+  const S = n * 4, src = document.createElement('canvas'); src.width = S; src.height = S;
+  const c = src.getContext('2d', { willReadFrequently: true });
+  c.textAlign = 'center'; c.textBaseline = 'middle';
+  c.font = Math.round(S * .8) + 'px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
+  _fillText.call(c, e, S / 2, S / 2 + S * .05);
+  const d = c.getImageData(0, 0, S, S).data, g = n + 2;
+  cv = document.createElement('canvas'); cv.width = g; cv.height = g;
+  const o = cv.getContext('2d'), img = o.createImageData(g, g), out = img.data, solid = new Uint8Array(g * g);
+  for (let cy = 0; cy < n; cy++) for (let cx = 0; cx < n; cx++) {
+    let r = 0, gg = 0, b = 0, a = 0;
+    for (let yy = 0; yy < 4; yy++) for (let xx = 0; xx < 4; xx++) { const i = ((cy * 4 + yy) * S + cx * 4 + xx) * 4, al = d[i + 3]; r += d[i] * al; gg += d[i + 1] * al; b += d[i + 2] * al; a += al; }
+    if (a / 16 > 100) {
+      const q = v => Math.min(255, Math.round(v / a / 20) * 20), k = (cy + 1) * g + cx + 1;
+      solid[k] = 1; out[k * 4] = q(r); out[k * 4 + 1] = q(gg); out[k * 4 + 2] = q(b); out[k * 4 + 3] = 255;
+    }
+  }
+  for (let y = 0; y < g; y++) for (let x = 0; x < g; x++) {
+    const k = y * g + x; if (solid[k]) continue;
+    if ((x > 0 && solid[k - 1]) || (x < g - 1 && solid[k + 1]) || (y > 0 && solid[k - g]) || (y < g - 1 && solid[k + g])) { out[k * 4] = 58; out[k * 4 + 1] = 46; out[k * 4 + 2] = 42; out[k * 4 + 3] = 235; }
+  }
+  o.putImageData(img, 0, 0); pxEmoCache.set(key, cv); return cv;
+}
+function emoParts(t) { const out = []; let last = 0; t.replace(EMO_RE_G, (m, off) => { if (off > last) out.push({ e: false, s: t.slice(last, off) }); out.push({ e: true, s: m }); last = off + m.length; return m; }); if (last < t.length) out.push({ e: false, s: t.slice(last) }); return out; }
+CanvasRenderingContext2D.prototype.fillText = function (t, x, y, mw) {
+  t = String(t);
+  if (!EMO_TEST.test(t)) return mw === undefined ? _fillText.call(this, t, x, y) : _fillText.call(this, t, x, y, mw);
+  const fs = parseFloat((/(\d+(?:\.\d+)?)px/.exec(this.font) || [0, '16'])[1]) || 16, ew = fs * 1.1;
+  const parts = emoParts(t), ws = parts.map(p => p.e ? ew : this.measureText(p.s).width), total = ws.reduce((a, b) => a + b, 0);
+  const al = this.textAlign, bl = this.textBaseline;
+  let sx = al === 'center' ? x - total / 2 : (al === 'right' || al === 'end') ? x - total : x;
+  const top = bl === 'middle' ? y - ew / 2 : (bl === 'top' || bl === 'hanging') ? y : (bl === 'bottom' || bl === 'ideographic') ? y - ew : y - ew * .82;
+  this.save(); this.textAlign = 'left';
+  parts.forEach((p, i) => {
+    if (p.e) { const n = Math.max(8, Math.min(18, Math.round(ew / 2))), im = pxEmoji(p.s, n), u = ew / n; this.imageSmoothingEnabled = false; this.drawImage(im, sx - u, top - u, im.width * u, im.height * u); }
+    else _fillText.call(this, p.s, sx, y);
+    sx += ws[i];
+  });
+  this.restore();
+};
+CanvasRenderingContext2D.prototype.strokeText = function (t, x, y, mw) {
+  t = String(t);
+  if (EMO_TEST.test(t)) return;
+  return mw === undefined ? _strokeText.call(this, t, x, y) : _strokeText.call(this, t, x, y, mw);
+};
+const emoUrl = new Map();
+function emoDataUrl(e) { let u = emoUrl.get(e); if (!u) { u = pxEmoji(e, 14).toDataURL(); emoUrl.set(e, u); } return u; }
+const PX_SKIP = new Set(['SCRIPT', 'STYLE', 'TEXTAREA', 'INPUT', 'TITLE', 'CANVAS', 'NOSCRIPT']);
+function pxifyText(node) {
+  const t = node.nodeValue; if (!t || !EMO_TEST.test(t)) return;
+  const p = node.parentNode; if (!p) return;
+  if (p.nodeName === 'OPTION') { node.nodeValue = t.replace(EMO_RE_G, '').replace(/^\s+/, ''); return; }
+  if (PX_SKIP.has(p.nodeName)) return;
+  const frag = document.createDocumentFragment();
+  emoParts(t).forEach(q => { if (!q.e) { frag.append(q.s); return; } const im = document.createElement('img'); im.src = emoDataUrl(q.s); im.alt = q.s; im.className = 'pxe'; im.draggable = false; frag.append(im); });
+  p.replaceChild(frag, node);
+}
+function pxifyTree(root) {
+  if (root.nodeType === 3) { pxifyText(root); return; }
+  if (root.nodeType !== 1 || PX_SKIP.has(root.nodeName)) return;
+  const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT), list = [];
+  while (w.nextNode()) list.push(w.currentNode);
+  list.forEach(pxifyText);
+}
+new MutationObserver(ms => { for (const m of ms) { if (m.type === 'characterData') pxifyText(m.target); else m.addedNodes.forEach(pxifyTree); } })
+  .observe(document.body, { childList: true, subtree: true, characterData: true });
+pxifyTree(document.body);
 'use strict';
 
 /* ---------- 기본 도구 ---------- */

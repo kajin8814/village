@@ -278,6 +278,11 @@ body.touch:not(.pad-mode) #joy{display:block;position:fixed;left:16px;bottom:cal
 body.touch #padToggle{display:block;position:fixed;left:16px;bottom:calc(env(safe-area-inset-bottom,0px) + 244px);font-size:12px;padding:4px 10px;z-index:11;opacity:.92}
 
 img.pxe{height:1.2em;width:auto;vertical-align:-0.22em;image-rendering:pixelated;display:inline-block;margin:0 .04em;pointer-events:none}
+
+#farmbar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 70px);display:flex;gap:8px;z-index:12}
+#farmbar[hidden]{display:none}
+#farmbar button{box-shadow:0 3px 0 rgba(0,0,0,.25)}
+body.touch #farmbar{bottom:calc(env(safe-area-inset-bottom,0px) + 250px)}
 </style>
 </head>
 <body>
@@ -308,6 +313,7 @@ img.pxe{height:1.2em;width:auto;vertical-align:-0.22em;image-rendering:pixelated
 <div id="duelhud" hidden aria-live="polite"></div>
 <div id="gamehud" hidden aria-live="polite"></div>
 <div id="bosshud" hidden aria-live="polite"></div>
+<div id="farmbar" hidden><button id="fbHarvest" class="bell">모두 수확</button><button id="fbWater" class="primary">모두 물 주기</button></div>
 <div id="decopanel" hidden></div>
 
 <div id="bottom">
@@ -983,6 +989,16 @@ const CROPS = {
   watermelon: { name: '수박', icon: '🍉', seed: 500, min: 240, sell: 1300, yield: 1 }
 };
 for (const [k, c] of Object.entries(CROPS)) ITEMS['c_' + k] = { name: c.name, icon: c.icon, type: 'crop', sell: c.sell };
+const SPECIALS = {
+  gold: { pre: '황금 ', mult: 10, chance: .03, mark: '' },
+  giant: { pre: '거대 ', mult: 5, chance: .06, mark: '' },
+  rabbit: { pre: '토끼 모양 ', mult: 4, chance: .02, mark: '🐰' },
+  heart: { pre: '하트 모양 ', mult: 4, chance: .02, mark: '♥' },
+  star: { pre: '별 모양 ', mult: 4, chance: .02, mark: '⭐' }
+};
+for (const [k, c] of Object.entries(CROPS)) for (const [sp, d] of Object.entries(SPECIALS))
+  ITEMS['c_' + k + '_' + sp] = { name: d.pre + c.name, icon: c.icon, type: 'crop', sp, sell: Math.round(c.sell * d.mult * Math.max(1, c.yield / 2) / 10) * 10 };
+function rollSpecial() { let r = Math.random(); for (const [sp, d] of Object.entries(SPECIALS)) { if (r < d.chance) return sp; r -= d.chance; } return ''; }
 const FARM_MAX = 8, FARM_PRICE = 3000, FARM_PLOT_MAX = 2, WATER_MS = 30 * 60000;
 const OW = 10, OH = 7, ON = OW * OH;
 const mkO = fn => { let t = ''; for (let r = 0; r < OH; r++) for (let c = 0; c < OW; c++) t += fn(r, c) || '0'; return t; };
@@ -1220,7 +1236,7 @@ function normalizeMe(m) {
   if (!Array.isArray(m.log.bossIds)) m.log.bossIds = [];
   if (!Array.isArray(m.log.gifts)) m.log.gifts = [];
   if (!m.log.animals || typeof m.log.animals !== 'object') m.log.animals = {};
-  m.farm = Array.isArray(m.farm) ? m.farm.filter(f => f && Number.isInteger(f.x) && Number.isInteger(f.y) && inb(f.x, f.y)).slice(0, 40).map(f => ({ x: f.x, y: f.y, c: CROPS[f.c] ? f.c : '', p: Number(f.p) || 0, l: Number(f.l) || 0, w: Number(f.w) || 0, pt: Number(f.pt) || 0 })) : [];
+  m.farm = Array.isArray(m.farm) ? m.farm.filter(f => f && Number.isInteger(f.x) && Number.isInteger(f.y) && inb(f.x, f.y)).slice(0, 40).map(f => ({ x: f.x, y: f.y, c: CROPS[f.c] ? f.c : '', p: Number(f.p) || 0, l: Number(f.l) || 0, w: Number(f.w) || 0, pt: Number(f.pt) || 0, sp: SPECIALS[f.sp] ? f.sp : '' })) : [];
   m.seeds = (m.seeds && typeof m.seeds === 'object') ? m.seeds : {};
   m.farmPlots = Array.isArray(m.farmPlots) ? [...new Set(m.farmPlots.filter(i => Number.isInteger(i) && FARM_PLOTS[i]))].slice(0, FARM_PLOT_MAX) : [];
   { const inPlot = f => m.farmPlots.some(i => { const p = FARM_PLOTS[i]; return f.x >= p.x && f.x < p.x + 2 && f.y >= p.y && f.y < p.y + 2; });
@@ -1414,7 +1430,7 @@ function drawBugShape(c, k, x, y, t, sc = 1) {
   c.restore();
 }
 function bugIcon(k, s = 40) { const c = el('canvas', { width: s, height: s, 'aria-hidden': 'true' }); drawBugShape(c.getContext('2d'), k, s / 2, s / 2 + 1, 200, s / 22); return c; }
-function visual(k) { if (typeof PXS !== 'undefined' && PXS['fu_' + k]) return sprThumb('fu_' + k, 40); const it = ITEMS[k]; return it && it.type === 'bug' ? bugIcon(k, 40) : el('span', { class: 'icon', 'aria-hidden': 'true', text: it ? it.icon : '❔' }); }
+function visual(k) { if (typeof PXS !== 'undefined' && PXS['fu_' + k]) return sprThumb('fu_' + k, 40); const it = ITEMS[k]; if (it && it.sp) return el('span', { class: 'icon', 'aria-hidden': 'true', style: it.sp === 'gold' ? 'filter:sepia(1) saturate(6) hue-rotate(-12deg) brightness(1.15)' : it.sp === 'giant' ? 'font-size:1.5em' : '', text: it.icon + (SPECIALS[it.sp].mark || '') }); return it && it.type === 'bug' ? bugIcon(k, 40) : el('span', { class: 'icon', 'aria-hidden': 'true', text: it ? it.icon : '❔' }); }
 function swatch(css) { return el('div', { 'aria-hidden': 'true', style: 'width:40px;height:40px;border-radius:10px;border:2px solid var(--line);flex:0 0 auto;background:' + css }); }
 
 /* 과일나무 (마을 공용, 30분) */
@@ -1624,26 +1640,90 @@ function useFarm(f) {
   const st = farmStage(f);
   if (st < 0) { openPlant(f); return; }
   if (st >= 3) {
-    const cr = CROPS[f.c], k = 'c_' + f.c;
-    if (!canAdd(k, cr.yield)) { bagFullWarn(); return; }
-    const stolen = seoriOnTile(f), got = Math.max(1, cr.yield - stolen);
-    addItem(k, got); me.log.harvests = (me.log.harvests || 0) + 1; clearSeori(f);
-    f.c = ''; f.p = 0; f.l = 0; f.w = 0; f.pt = 0; markDirty();
-    toast(cr.name + ' ' + got + '개를 수확했어요!' + (stolen ? ' 누군가 ' + stolen + '개를 서리해 갔어요 🤫' : ''), 'good'); doEmote(1); return;
+    const r = harvestTile(f);
+    if (!r) { bagFullWarn(); return; }
+    markDirty(); doEmote(1);
+    toast(r.cr.name + ' ' + r.got + '개를 수확했어요!' + (r.sk ? ' 그중 하나는 ' + ITEMS[r.sk].name + '!' : '') + (r.stolen ? ' 누군가 ' + r.stolen + '개를 서리해 갔어요' : ''), 'good');
+    if (r.sk) specialHarvestFx([r.sk]);
+    return;
   }
   if (!me.tools.can) { toast(josa(CROPS[f.c].name, '이', '가') + ' 자라는 중이에요. 약 ' + farmLeftMin(f) + '분 남았어요. 물뿌리개가 있으면 더 빨리 자라요'); return; }
   if (Date.now() < (f.w || 0)) { toast('흙이 아직 촉촉해요. 약 ' + farmLeftMin(f) + '분 뒤에 다 자라요'); return; }
-  f.p = farmProgress(f); f.l = Date.now(); f.w = Date.now() + WATER_MS; markDirty();
+  waterTile(f); markDirty();
   toast('물을 줬어요. 30분 동안 두 배로 빨리 자라요', 'good');
 }
+function waterTile(f) { f.p = farmProgress(f); f.l = Date.now(); f.w = Date.now() + WATER_MS; }
+function harvestTile(f) {
+  const cr = CROPS[f.c]; if (!cr) return null;
+  const k = 'c_' + f.c, stolen = seoriOnTile(f), got = Math.max(1, cr.yield - stolen);
+  const sk = f.sp && SPECIALS[f.sp] ? k + '_' + f.sp : '', normal = sk ? got - 1 : got;
+  if ((normal > 0 && !canAdd(k, normal)) || (sk && !canAdd(sk, 1))) return null;
+  if (normal > 0) addItem(k, normal);
+  if (sk) addItem(sk, 1);
+  me.log.harvests = (me.log.harvests || 0) + 1; clearSeori(f);
+  f.c = ''; f.p = 0; f.l = 0; f.w = 0; f.pt = 0; f.sp = '';
+  return { cr, got, stolen, sk };
+}
+function farmCounts() {
+  const now = Date.now(); let ripe = 0, dry = 0;
+  for (const f of me.farm) { const st = farmStage(f, now); if (st >= 3) ripe++; else if (st >= 0 && now >= (f.w || 0)) dry++; }
+  return { ripe, dry };
+}
+function harvestAll() {
+  const got = {}, specials = []; let n = 0, full = false;
+  for (const f of me.farm) {
+    if (farmStage(f) < 3) continue;
+    const r = harvestTile(f);
+    if (!r) { full = true; break; }
+    n++; got[r.cr.name] = (got[r.cr.name] || 0) + r.got; if (r.sk) specials.push(r.sk);
+  }
+  if (!n) { toast(full ? '가방이 가득 차서 수확하지 못했어요' : '다 자란 작물이 없어요'); return; }
+  markDirty(); doEmote(1);
+  toast(n + '칸을 수확했어요! ' + Object.entries(got).map(([k, v]) => k + ' ' + v + '개').join(', ') + (specials.length ? '. 특별한 작물: ' + specials.map(k => ITEMS[k].name).join(', ') : '') + (full ? '. 가방이 가득 차서 나머지는 남겨 뒀어요' : ''), 'good');
+  if (specials.length) specialHarvestFx(specials);
+}
+function waterAll() {
+  if (!me.tools.can) { toast('물뿌리개가 있어야 해요. 상점 도구 칸에서 사요'); return; }
+  const now = Date.now(); let n = 0;
+  for (const f of me.farm) { const st = farmStage(f, now); if (st >= 0 && st < 3 && now >= (f.w || 0)) { waterTile(f); n++; } }
+  if (!n) { toast('물을 줄 밭이 없어요. 이미 촉촉하거나 비어 있어요'); return; }
+  markDirty(); toast(n + '칸에 물을 줬어요. 30분 동안 두 배로 빨리 자라요', 'good');
+}
+function specialHarvestFx(list) {
+  const best = list.slice().sort((a, b) => ITEMS[b].sell - ITEMS[a].sell)[0];
+  announce(me.name + '님이 특별한 작물 ' + josa(ITEMS[best].name, '을', '를') + ' 수확했어요!');
+  toast('상점에 팔면 ' + fmtBell(ITEMS[best].sell) + '이에요', 'good');
+  beep(880, .12, 'sine', .05); setTimeout(() => beep(1320, .15, 'sine', .05), 140);
+}
+let farmBarT = 0;
+function updateFarmBar(now) {
+  if (now - farmBarT < 300) return; farmBarT = now;
+  const bar = $('#farmbar');
+  let show = false, c = null;
+  if (me && scene.type === 'village' && !modal && me.farm.length) {
+    const near = me.farm.some(f => Math.hypot((f.x + .5) * T - player.x, (f.y + .5) * T - player.y) < 5 * T);
+    if (near) { c = farmCounts(); show = c.ripe > 0 || c.dry > 0; }
+  }
+  if (!show) { if (!bar.hidden) bar.hidden = true; return; }
+  bar.hidden = false;
+  const h = $('#fbHarvest'), w = $('#fbWater');
+  h.hidden = !c.ripe; w.hidden = !c.dry || !me.tools.can;
+  h.textContent = '모두 수확 (' + c.ripe + '칸)'; w.textContent = '모두 물 주기 (' + c.dry + '칸)';
+}
+$('#fbHarvest').onclick = () => harvestAll();
+$('#fbWater').onclick = () => waterAll();
 function openPlant(f) {
   openModal({ title: '내 밭', tabs: [{ id: 'p', label: '씨앗 심기', render: body => {
     const ks = Object.keys(CROPS).filter(k => (me.seeds[k] || 0) > 0);
     body.append(el('p', { class: 'lead', text: '심을 씨앗을 골라요. 씨앗은 상점 씨앗 칸에서 사요.' }));
     body.append(el('div', { class: 'cards' }, ks.length ? ks.map(k => { const cr = CROPS[k]; return card({ icon: cr.icon, title: cr.name, badge: { text: (me.seeds[k] || 0) + '개' }, text: (cr.min >= 60 ? (cr.min / 60) + '시간' : cr.min + '분') + ' 뒤 ' + cr.yield + '개 수확',
-      actions: [el('button', { class: 'primary', onclick: () => { if (!(me.seeds[k] > 0)) return; me.seeds[k]--; if (!me.seeds[k]) delete me.seeds[k]; f.c = k; f.p = 0; f.l = Date.now(); f.w = 0; f.pt = Date.now(); markDirty(); closeModal(); toast(cr.name + ' 씨앗을 심었어요', 'good'); } }, '심기')] }); })
+      actions: [el('button', { class: 'primary', onclick: () => { if (!(me.seeds[k] > 0)) return; me.seeds[k]--; if (!me.seeds[k]) delete me.seeds[k]; f.c = k; f.p = 0; f.l = Date.now(); f.w = 0; f.pt = Date.now(); f.sp = rollSpecial(); markDirty(); closeModal(); toast(cr.name + ' 씨앗을 심었어요', 'good'); } }, '심기')] }); })
       : [card({ icon: '🌱', title: '씨앗이 없어요', text: '상점 씨앗 칸에서 감자, 딸기, 수박 같은 씨앗을 살 수 있어요.', cls: 'wide empty' })]));
-    body.append(el('div', { class: 'inline', style: 'margin-top:12px' }, el('button', { class: 'ghost', onclick: () => sellFarmPlotOf(f) }, '농장 팔기 (1,500벨 돌려받기)')));
+    const fc = farmCounts();
+    body.append(el('div', { class: 'inline', style: 'margin-top:12px' },
+      el('button', { class: 'bell', disabled: !fc.ripe, onclick: () => { closeModal(); harvestAll(); } }, '다 자란 작물 모두 수확 (' + fc.ripe + '칸)'),
+      el('button', { class: 'primary', disabled: !fc.dry || !me.tools.can, onclick: () => { closeModal(); waterAll(); } }, '모든 밭에 물 주기 (' + fc.dry + '칸)'),
+      el('button', { class: 'ghost', onclick: () => sellFarmPlotOf(f) }, '농장 팔기 (1,500벨 돌려받기)')));
   } }] });
 }
 function drawFarms(now) {
@@ -1658,8 +1738,17 @@ function drawFarms(now) {
     else if (st === 1) { oval(ctx, cx - 3, by - 10, 3, 1.6, -0.6, '#6cc06a'); oval(ctx, cx + 3, by - 10, 3, 1.6, 0.6, '#6cc06a'); ctx.fillStyle = '#4f9a4e'; ctx.fillRect(cx - .5, by - 10, 1.5, 6); }
     else if (st === 2) { ctx.fillStyle = '#4f9a4e'; ctx.fillRect(cx - 1, by - 16, 2, 13); oval(ctx, cx - 6, by - 12, 6, 2.5, -0.5, '#6cc06a'); oval(ctx, cx + 6, by - 14, 6, 2.5, 0.5, '#6cc06a'); oval(ctx, cx, by - 18, 4, 3, 0, '#7fd17a'); }
     else if (st === 3) {
-      ctx.font = '20px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillStyle = '#000000';
-      ctx.fillText(CROPS[f.c].icon, cx, by + 2 - Math.abs(Math.sin(now / 400 + f.x)) * 2);
+      const sp = f.sp && SPECIALS[f.sp] ? f.sp : '', bob = Math.abs(Math.sin(now / 400 + f.x)) * 2;
+      if (sp) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; const gr = ctx.createRadialGradient(cx, by - 10, 0, cx, by - 10, 22); gr.addColorStop(0, sp === 'gold' ? 'rgba(255,215,80,.55)' : 'rgba(255,240,200,.35)'); gr.addColorStop(1, 'rgba(255,215,80,0)'); ctx.fillStyle = gr; ctx.fillRect(cx - 22, by - 32, 44, 44); ctx.restore(); }
+      ctx.save();
+      if (sp === 'gold' && 'filter' in ctx) ctx.filter = 'sepia(1) saturate(6) hue-rotate(-12deg) brightness(1.15)';
+      ctx.font = (sp === 'giant' ? 34 : 20) + 'px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.fillStyle = '#000000';
+      ctx.fillText(CROPS[f.c].icon, cx, by + (sp === 'giant' ? 6 : 2) - bob);
+      ctx.restore();
+      if (sp === 'heart') drawSprC(ctx, 'fx_heart', cx + 9, by - 20 - bob, 2, '#ff6b8b');
+      else if (sp === 'star') drawSprC(ctx, 'fx_star', cx + 9, by - 20 - bob, 2, '#ffd84d');
+      else if (sp === 'rabbit') { ctx.fillStyle = '#3a2e2a'; ctx.fillRect(cx - 7, by - 31 - bob, 5, 11); ctx.fillRect(cx + 2, by - 31 - bob, 5, 11); ctx.fillStyle = '#ffffff'; ctx.fillRect(cx - 6, by - 30 - bob, 3, 9); ctx.fillRect(cx + 3, by - 30 - bob, 3, 9); ctx.fillStyle = '#f6a9bd'; ctx.fillRect(cx - 5, by - 28 - bob, 1, 6); ctx.fillRect(cx + 4, by - 28 - bob, 1, 6); }
+      if (sp && ((now / 250) | 0) % 2) { ctx.fillStyle = '#fff6b0'; ctx.fillRect(cx - 12, by - 22, 2, 2); ctx.fillRect(cx + 11, by - 8, 2, 2); }
       if (((now / 400) | 0) % 3 === (f.x + f.y) % 3) { ctx.fillStyle = '#ffffff'; ctx.fillRect(x + T - 8, y + 4, 2, 2); }
     }
   }
@@ -5271,7 +5360,7 @@ function openMenu(which) {
       card({ icon: '⌨️', title: '걷기와 달리기', text: '방향키나 WASD로 걷고 Shift를 누른 채 움직이면 달려요. 휴대폰은 방향 패드와 달리기 버튼을 써요.' }),
       card({ icon: '🚪', title: '들어가기', text: '건물 문 앞이나 집 앞에서 E를 눌러요. 휴대폰은 노란 A 버튼이에요.' }),
       card({ icon: '🍎', title: '과일나무', text: '열매 달린 나무를 E로 흔들면 열매 3개가 떨어지고, 걸어가면 주워요. 마을 공용이라 30분 뒤 다시 열려요. 가끔 벨 주머니도 떨어져요.' }),
-      card({ icon: '🌱', title: '농장과 서리', text: '마을 남쪽 농장 구역에서 빈 농장(2×2칸)을 3,000벨에 사요. 한 사람이 2개까지 가질 수 있어요. 상점 씨앗 칸에서 씨앗을 사서 밭 앞에서 E로 심고, 물뿌리개로 물을 주면 30분 동안 두 배로 빨리 자라요. 비가 오면 저절로 물이 줘져요. 친구 밭에 다 자란 작물이 있으면 몰래 하나 서리할 수 있지만, 들킬 수도 있어요.' }),
+      card({ icon: '🌱', title: '농장과 서리', text: '마을 남쪽 농장 구역에서 빈 농장(2×2칸)을 3,000벨에 사요. 한 사람이 2개까지 가질 수 있어요. 상점 씨앗 칸에서 씨앗을 사서 밭 앞에서 E로 심고, 물뿌리개로 물을 주면 30분 동안 두 배로 빨리 자라요. 비가 오면 저절로 물이 줘져요. 내 농장 근처에 서면 모두 수확, 모두 물 주기 버튼이 나와요. 가끔 황금, 거대, 토끼·하트·별 모양 작물이 자라는데, 상점에 팔면 4~10배 비싸요. 친구 밭에 다 자란 작물이 있으면 몰래 하나 서리할 수 있지만, 들킬 수도 있어요.' }),
       card({ icon: '👕', title: '옷', text: '꾸밈방 옷 탭에서 옷을 입어 보고 사요. 내가 직접 디자인한 옷도 3벌까지 만들어 입을 수 있어요.' }),
       card({ icon: '🏊', title: '수영과 잠수', text: '강, 연못, 바다로 걸어 들어가면 수영해요. 물속 그림자 가까이에서 E나 Space를 누르면 잠수해서 물고기와 해산물을 잡아요. 성게, 전복, 바닷가재, 다슬기 같은 생물은 잠수로만 잡을 수 있어요. 자동차를 탄 채로는 물에 못 들어가요.' }),
       card({ icon: '🎣', title: '낚시', text: '물을 바라보고 E로 찌를 던져요. 빨간 !가 뜨면 1.8초 안에 E를 눌러요. 강과 바다에 사는 물고기가 달라요.' }),
@@ -6048,7 +6137,7 @@ function frame(now) {
     const dt = Math.min(0.05, Math.max(0, (now - lastFrame) / 1000)); lastFrame = now;
     updatePlayer(dt);
     if (me && scene.type === 'village') { updateFishing(now); updateBugs(dt, now); pickupDrops(now); updateDive(dt, now); updateWild(dt, now); }
-    if (me) { updateDuel(dt, now); updateDuelHud(now); actSound(now); updateGameHud(now); updateBoss(dt, now); updateBossHud(now); }
+    if (me) { updateDuel(dt, now); updateDuelHud(now); actSound(now); updateGameHud(now); updateBoss(dt, now); updateBossHud(now); updateFarmBar(now); }
     for (const r of remotes.values()) {
       const k = Math.min(1, dt * 10);
       r.x += (r.tx - r.x) * k; r.y += (r.ty - r.y) * k;

@@ -800,7 +800,7 @@ const FURN_LIST = [
   ['a_shield', '기사의 방패', '🛡️', 2600, '', 1], ['a_sword', '장식 검', '⚔️', 2400, '', 1]
 ];
 FURN_LIST.forEach(([k, name, icon, price, act, antique, walk]) => { ITEMS[k] = { name, icon, type: 'furniture', price, sell: Math.round(price / 2), act: act || '', antique: !!antique, walk: !!walk }; });
-const MERCHANT_FURN = [['m_unicorn', '유니콘 인형', '🦄', 4000], ['m_planet', '행성 모형', '🪐', 5000], ['m_moai', '모아이 석상', '🗿', 6000], ['m_castle', '성 모형', '🏯', 8000], ['m_circus', '서커스 텐트', '🎪', 7000], ['m_mirrorball', '미러볼', '🪩', 5500], ['m_chime', '풍경', '🎐', 3000], ['m_pinata', '피냐타', '🪅', 3500], ['m_crystal', '수정 구슬', '🔮', 4500], ['m_bamboo', '소원 대나무', '🎋', 4000], ['m_volcano', '화산 모형', '🌋', 6500], ['m_rocket', '로켓 모형', '🚀', 7500]];
+const MERCHANT_FURN = [['m_unicorn', '유니콘 인형', '🦄', 4000], ['m_planet', '행성 모형', '🪐', 5000], ['m_moai', '모아이 석상', '🗿', 6000], ['m_castle', '성 모형', '🏯', 8000], ['m_circus', '서커스 텐트', '🎪', 7000], ['m_mirrorball', '미러볼', '🪩', 5500], ['m_chime', '풍경', '🎐', 3000], ['m_pinata', '피냐타', '🪅', 3500], ['m_crystal', '수정 구슬', '🔮', 4500], ['m_bamboo', '소원 대나무', '🎋', 4000], ['m_volcano', '화산 모형', '🌋', 6500], ['m_rocket', '로켓 모형', '🚀', 7500], ['m_arcade', '레트로 오락기', '🕹️', 8000], ['m_moonlamp', '달 무드등', '🌙', 4500], ['m_aquarium', '큰 어항', '🐠', 7000], ['m_gumball', '뽑기 기계', '🍭', 5000], ['m_teddy', '큰 곰인형', '🧸', 5500], ['m_jukebox', '주크박스', '📻', 9000]];
 MERCHANT_FURN.forEach(([k, name, icon, price]) => { ITEMS[k] = { name, icon, type: 'furniture', price, sell: Math.round(price / 2), act: '', antique: false, walk: false, merchant: true }; });
 const MERCHANT_POOL = [...MERCHANT_FURN.map(r => r[0]), 'starcandy'];
 const GYM_ID = '__gym';
@@ -1414,7 +1414,7 @@ function drawBugShape(c, k, x, y, t, sc = 1) {
   c.restore();
 }
 function bugIcon(k, s = 40) { const c = el('canvas', { width: s, height: s, 'aria-hidden': 'true' }); drawBugShape(c.getContext('2d'), k, s / 2, s / 2 + 1, 200, s / 22); return c; }
-function visual(k) { const it = ITEMS[k]; return it && it.type === 'bug' ? bugIcon(k, 40) : el('span', { class: 'icon', 'aria-hidden': 'true', text: it ? it.icon : '❔' }); }
+function visual(k) { if (typeof PXS !== 'undefined' && PXS['fu_' + k]) return sprThumb('fu_' + k, 40); const it = ITEMS[k]; return it && it.type === 'bug' ? bugIcon(k, 40) : el('span', { class: 'icon', 'aria-hidden': 'true', text: it ? it.icon : '❔' }); }
 function swatch(css) { return el('div', { 'aria-hidden': 'true', style: 'width:40px;height:40px;border-radius:10px;border:2px solid var(--line);flex:0 0 auto;background:' + css }); }
 
 /* 과일나무 (마을 공용, 30분) */
@@ -1712,7 +1712,7 @@ function outfitTab(body) {
           el('button', { onclick: () => { designEdit = i; modal.render(); } }, d ? '고치기' : '새로 만들기')] });
     })));
   body.append(el('div', { class: 'sec-title', style: 'margin-top:12px', text: '옷 가게' }),
-    el('div', { class: 'cards' }, Object.entries(OUTFITS).map(([id, o]) => {
+    el('div', { class: 'cards' }, Object.entries(OUTFITS).filter(([id, o]) => !o.merchant || a.own.includes(id)).map(([id, o]) => {
       const own = a.own.includes(id), worn = a.outfit === id, trying = outfitTry === id;
       const acts = own
         ? [el('button', { class: worn ? '' : 'primary', onclick: () => { a.outfit = worn ? '' : id; outfitTry = null; markDirty(); modal.render(); } }, worn ? '벗기' : '입기')]
@@ -2420,7 +2420,7 @@ function merchantStock() {
   let seed = 4242; for (const ch of key) seed = (Math.imul(seed, 33) + ch.charCodeAt(0)) | 0;
   const r = mulberry32(seed); r();
   const pool = MERCHANT_POOL.slice(), out = [];
-  while (out.length < 4 && pool.length) { const k = pool.splice(Math.floor(r() * pool.length), 1)[0]; out.push({ k, price: Math.max(100, Math.round(ITEMS[k].price * (0.8 + r() * 0.4) / 50) * 50) }); }
+  while (out.length < MERCHANT_COUNT && pool.length) { const k = pool.splice(Math.floor(r() * pool.length), 1)[0], base = ITEMS[k] ? ITEMS[k].price : OUTFITS[k].price; out.push({ k, price: Math.max(100, Math.round(base * (0.8 + r() * 0.4) / 50) * 50) }); }
   return (mStockCache[key] = out);
 }
 function openMerchant() {
@@ -2428,8 +2428,16 @@ function openMerchant() {
     body.append(el('div', { style: 'display:flex;justify-content:center;margin-bottom:6px' }, sprThumb('merchant', 72)));
     const inf = merchantInfo(), hh = Math.floor(inf.left / 60), mm = inf.left % 60;
     body.append(el('p', { class: 'lead', text: '"이번에만 파는 귀한 물건이에요! 하루에 7번 물건을 바꾸니 자주 들러 줘요." 다음 물건까지 ' + (hh ? hh + '시간 ' : '') + mm + '분 남았어요. 지금 ' + fmtBell(me.bells) + ' 있어요.' }));
-    body.append(el('div', { class: 'cards' }, merchantStock().map(({ k, price }) => { const it = ITEMS[k]; return card({ canvas: visual(k), title: it.name, badge: { text: fmtBell(price), cls: 'gold' }, text: it.type === 'furniture' ? '상인에게서만 살 수 있는 가구예요. 집 보관함으로 보내 드려요.' : '먹으면 기분이 반짝반짝해져요.',
-      actions: [el('button', { class: 'primary', disabled: me.bells < price, onclick: () => { if (me.bells < price) return; if (it.type === 'furniture') me.storage[k] = (me.storage[k] || 0) + 1; else { if (!canAdd(k)) { bagFullWarn(); return; } addItem(k); } me.bells -= price; markDirty(); toast(josa(it.name, '을', '를') + ' 샀어요!', 'good'); modal.render(); } }, '사기')] }); })));
+    body.append(el('div', { class: 'cards' }, merchantStock().map(({ k, price }) => {
+      const o = OUTFITS[k], it = ITEMS[k];
+      if (o) {
+        const own = me.acc.own.includes(k);
+        return card({ canvas: outfitPreview(o.pat), title: o.name, badge: own ? { text: '가지고 있어요' } : { text: fmtBell(price), cls: 'gold' }, text: '상인만 파는 옷이에요. 사면 꾸밈방 옷 칸에서 입을 수 있어요.',
+          actions: [el('button', { class: 'primary', disabled: own || me.bells < price, onclick: () => { if (own || me.bells < price) return; me.bells -= price; me.acc.own.push(k); markDirty(); toast(josa(o.name, '을', '를') + ' 샀어요! 꾸밈방 옷 칸에서 입어 봐요', 'good'); modal.render(); } }, own ? '가지고 있어요' : '사기')] });
+      }
+      return card({ canvas: visual(k), title: it.name, badge: { text: fmtBell(price), cls: 'gold' }, text: it.type === 'furniture' ? '상인만 파는 픽셀 가구예요. 집 보관함으로 보내 드려요.' : '먹으면 기분이 반짝반짝해져요.',
+        actions: [el('button', { class: 'primary', disabled: me.bells < price, onclick: () => { if (me.bells < price) return; if (it.type === 'furniture') me.storage[k] = (me.storage[k] || 0) + 1; else { if (!canAdd(k)) { bagFullWarn(); return; } addItem(k); } me.bells -= price; markDirty(); toast(josa(it.name, '을', '를') + ' 샀어요!', 'good'); modal.render(); } }, '사기')] });
+    })));
   } }] });
 }
 function drawMerchant(now) {
@@ -2441,7 +2449,7 @@ function drawMerchant(now) {
   drawSpr(ctx, 'merchant', x + T / 2, y + 16 + Math.sin(now / 500) * 1.5, 2);
   ctx.fillStyle = '#a0714a'; ctx.fillRect(x - 6, y + 10, T + 12, 18); ctx.fillStyle = '#8a5a3a'; ctx.fillRect(x - 6, y + 10, T + 12, 3);
   oval(ctx, x - 1, y + 29, 5, 5, 0, '#5a4030'); oval(ctx, x + T + 1, y + 29, 5, 5, 0, '#5a4030');
-  [['#e8736f', '#b84a46'], ['#86bdea', '#4f86c4'], ['#f2c44a', '#c99a2a']].forEach(([a1, a2], i) => { const bx = x - 2 + i * 13, by = y + 16; ctx.fillStyle = '#3a2e2a'; ctx.fillRect(bx - 1, by - 1, 12, 10); ctx.fillStyle = a1; ctx.fillRect(bx, by, 10, 8); ctx.fillStyle = a2; ctx.fillRect(bx, by + 3, 10, 2); ctx.fillStyle = '#fff6b0'; ctx.fillRect(bx + 4, by, 2, 8); });
+  merchantStock().filter(o => PXS['fu_' + o.k]).slice(0, 3).forEach((o, i) => drawSpr(ctx, 'fu_' + o.k, x + 2 + i * 14, y + 25, 1));
   pill('떠돌이 상인', x + T / 2, y - 30, '#fff3c4', '#5a4310', '11px Jua, sans-serif');
 }
 
@@ -2603,6 +2611,43 @@ function accThumb(k) {
   return sprThumb(k);
 }
 function DEFAULT_PX_SAFE() { return validPx(''); }
+
+/* 상인 전용 픽셀 가구와 옷 */
+Object.assign(PXS, {
+  fu_m_unicorn: ["k#3a2e2a w#ffffff p#f6a9bd y#ffd84d v#c3a6ec b#86bdea g#e6e0f0 e#2b2b2b", "..........y...|.........yk...|....kkk.kwk...|...kpvbkwwwk..|..kpvbkwwwewk.|..kvbkwwwwwwk.|...kkwwwwwwpk.|....kwwwwkkk..|...kwwwwwwk...|..kwwwwwwwwk..|..kwgwwwwgwk..|..kwwkwwkwwk..|..kgk.kk.kgk..|..kk..kk..kk.."],
+  fu_m_planet: ["k#3a2e2a o#f2a65a d#d9803a r#c3a6ec l#e6d6ff b#6b4a30", ".....kkkk.....|...kkooddkk...|..kooodooook..|krrkkoooodkrrk|klllrrrrrrrllk|.kkrrooddrrkk.|..kooooooddk..|...kkoodokk...|.....kkkk.....|......kk......|......kk......|....kkkkkk....|...kbbbbbbk...|...kkkkkkkk..."],
+  fu_m_moai: ["k#3a2e2a g#9a9aa6 d#6b6b78 l#c0c0ca m#7fae6a", "....kkkkk.....|...kgggggk....|..kgggggggk...|..kddgggddk...|..kgkgggkgk...|..kggdgggdk...|..kggdggggk...|..kggddgggk...|...kgkkkgk....|...kgggggk....|...kglgglk....|..kgggggggk...|.kmmmmmmmmmk..|.kkkkkkkkkkk.."],
+  fu_m_castle: ["k#3a2e2a w#f4ecdf g#d6c8b4 r#e8736f b#6b4a30 y#ffd84d s#86bdea", "..k...y...k...|.krk.kyk.krk..|kwwwkk.kkwwwk.|kwkwk...kwkwk.|kwwwkkkkkwwwk.|kwswwkwkwwswk.|kwwwwwwwwwwwk.|kgwkwkwkwkwgk.|kwwwwkkkwwwwk.|kwwwkbbbkwwwk.|kwwwkbbbkwwwk.|kggggbbbggggk.|kkkkkkkkkkkkk."],
+  fu_m_circus: ["k#3a2e2a r#e8736f w#ffffff y#ffd84d b#6b4a30", "......y.......|......k.......|.....krk......|....krwrk.....|...krwrwrk....|..krwrwrwrk...|.krwrwrwrwrk..|kkkkkkkkkkkkk.|kryryryryryrk.|.kwrwk.kwrwk..|.kwrwkbkwrwk..|.kwrwkbkwrwk..|.kkkkkkkkkkk.."],
+  fu_m_mirrorball: ["k#3a2e2a g#c0c0ca w#ffffff b#86bdea p#f6a9bd d#7a7a88", "......k.......|......k.......|......k.......|....kkkkk.....|...kwgbgwk....|..kgbgwgpgk...|..kwgpgbgwk...|..kgbgwgdgk...|..kwgdgbgwk...|...kgdgdgk....|....kkkkk.....|..w.......p...|b.....w.....b.|...p.....w...."],
+  fu_m_chime: ["k#3a2e2a g#bfe6f5 w#ffffff r#e8736f p#f6a9bd s#7a6a60", "......k.......|......k.......|....kkkkk.....|...kgggggk....|..kgwgrgwgk...|..kgggggggk...|..kkkkkkkkk...|......s.......|......k.......|.....kpk......|.....kpk......|.....kpk......|......k......."],
+  fu_m_pinata: ["k#3a2e2a p#f48fb1 y#ffd84d b#86bdea g#86c96f o#f2a65a", "..kk..........|.kpk..........|kppk..........|kppkkkkkkkk...|.kpyyyyyyyyk..|..kbbbbbbbbbk.|..kggggggggk..|..kooooooook..|..kppppppppk..|..kpk.kk.kpk..|..kpk.kk.kpk..|..kk..kk..kk.."],
+  fu_m_crystal: ["k#3a2e2a v#c3a6ec l#efe6ff d#8f72c9 w#ffffff y#ffd84d b#6b4a30", "....kkkkk.....|...kvvvvvk....|..kvlwvvvvk...|..kvwlvvvdk...|..kvvvvvvdk...|..kvvvvvddk...|...kvvvddk....|....kkkkk.....|..kyyyyyyyk...|..kbbbbbbbk...|.kbbbbbbbbbk..|.kkkkkkkkkkk.."],
+  fu_m_bamboo: ["k#3a2e2a g#86c96f d#4fa860 p#f6a9bd y#ffd84d b#86bdea s#a0714a", "...kdk........|..kgdgk.kk....|...kgk.kgdk...|...kdkkgdk....|..pkgk.kk.....|..pkgkk.......|...kdkdk.y....|...kgk.kky....|...kgk...b....|...kdk...b....|...kgk........|..kssssk......|..kssssk......|..kkkkkk......"],
+  fu_m_volcano: ["k#3a2e2a r#e8473f o#f2a65a b#8a5a3a d#6b4a30 g#86c96f", "....o..r......|.....r.o......|....rok.r.....|.....kok......|....kroork....|...kbrrrrbk...|...kbbrrbbk...|..kbbbbrbbbk..|..kbdbbbbdbk..|.kbbbbdbbbbbk.|.kbdbbbbbbdbk.|kggggggggggggk|kkkkkkkkkkkkkk"],
+  fu_m_rocket: ["k#3a2e2a w#f4ecdf r#e8736f b#86bdea o#f2a65a y#ffd84d g#9a9aa6", "......kk......|.....krrk.....|....kwwwwk....|....kwbbwk....|....kwbbwk....|....kwwwwk....|....kwwwwk....|...krwwwwrk...|..krrwrrwrrk..|..kkkkkkkkkk..|.....kyok.....|......ko......|.....kggk.....|...kggggggk...|...kkkkkkkk..."],
+  fu_m_arcade: ["k#3a2e2a p#c3a6ec d#8f72c9 s#2b2b2b g#7fd68a y#ffd84d r#e8473f b#86bdea", "..kkkkkkkkkk..|..kppyyyyppk..|..kkkkkkkkkk..|..kpksssskpk..|..kpksgyskpk..|..kpksssskpk..|..kpkkkkkkpk..|.kpppppppppk..|.kpkrkbkyppk..|.kddddddddk...|..kpppppppk...|..kpdddddpk...|..kpppppppk...|..kkkkkkkkk..."],
+  fu_m_moonlamp: ["k#3a2e2a y#ffe066 l#fff6b0 d#e0b83a w#ffffff b#a0714a", "....kkkk......|...kyyyylk....|..kyykkkk.....|..kyk.........|.kyyk...w.....|.kyyk.........|.kyyk.....w...|..kyyk........|..kdyykkkk....|...kddyyyk....|....kkkkk.....|......k.......|.....kbk......|...kkbbbkk....|...kkkkkkk...."],
+  fu_m_aquarium: ["k#3a2e2a b#86bdea l#bfe6f5 o#f2a65a g#86c96f s#e8d6a8 w#ffffff d#6b4a30", "kkkkkkkkkkkkkk|klllllllllllk.|kbbbbbbbbbbbk.|kbbwbbbbbbbbk.|kbbbbkobbbbbk.|kbbbkoookbbbk.|kbbbbkobbgbbk.|kbgbbbbbbgbbk.|kbgbbbwbbgbbk.|ksssssssssssk.|kkkkkkkkkkkkk.|kdddddddddddk.|kdk.......kdk.|kkk.......kkk."],
+  fu_m_gumball: ["k#3a2e2a g#bfe6f5 w#ffffff r#e8473f y#ffd84d b#86bdea p#f6a9bd e#e8736f", "....kkkkk.....|..kkgwgggkk...|.kgrgygbgpgk..|.kgypgrgygbk..|.kgbgpgygrgk..|..kkgggggkk...|...kkkkkkk....|...keeeeek....|...kekkkek....|...kekyyek....|...keeeeek....|..keeeeeeek...|..kkkkkkkkk..."],
+  fu_m_teddy: ["k#3a2e2a b#c98a55 l#f2d0a4 e#2b2b2b r#e8736f", "..kk.....kk...|.kblk...klbk..|.kbbkkkkkbbk..|..kbbbbbbbk...|..kbebbbebk...|..kbbllllbk...|...kblelbk....|..kkrrrrrkk...|.kbbbrrrbbbk..|kbbkbllbkbbk..|kbk.kllllkbk..|..kbbbbbbbk...|.kllkkkkllk...|.kkk....kkk..."],
+  fu_m_jukebox: ["k#3a2e2a o#f2a65a y#ffd84d r#e8736f p#c3a6ec b#6b4a30 s#2b2b2b g#7fd68a", "...kkkkkkk....|..kyyyyyyyk...|.kyroooooryk..|.kyrkkkkkryk..|.kyrkpgpkryk..|.kyrkkkkkryk..|.kyrbbbbbryk..|.kyrbsbsbryk..|.kyrbbbbbryk..|.kyrsssssryk..|.kyrbbbbbryk..|.kyyyyyyyyyk..|.kkkkkkkkkkk.."],
+  fu_starcandy: ["k#3a2e2a p#f6a9bd y#ffd84d b#86bdea g#7fd68a w#ffffff", "...kkkkkkk....|..kwwwwwwwk...|.kwpwywwbwwk..|.kwwwwgwwpwk..|.kwbwwwywwwk..|.kwwwpwwbwwk..|.kwywwwgwwyk..|..kwwwwwwwk...|...kkkkkkk...."]
+});
+const MERCHANT_OUTFITS = {
+  o_m_wizard: { name: '별빛 마법사 로브', price: 5000, rows: ['aaaa66aaaa', 'aa6aaaa6aa', 'aaaaaaaaaa', '6666666666', 'aaa6aaaa6a', 'aaaaaaaaaa', '6a6a6a6a6a'] },
+  o_m_bee: { name: '꿀벌 옷', price: 3500, rows: ['6666666666', 'cccccccccc', '6666666666', 'cccccccccc', '6666666666', 'cccc00cccc', 'cccc00cccc'] },
+  o_m_berry: { name: '딸기 원피스', price: 4000, rows: ['9999999999', 'bbbbbbbbbb', 'bb2bbbb2bb', 'bbbbb2bbbb', 'b2bbbbbb2b', 'bbbbbbbbbb', '0bbbbbbbb0'] },
+  o_m_sailor: { name: '세일러복', price: 4500, rows: ['8822222288', '8882222888', '2228bb8222', '2222bb2222', '2222222222', '8888008888', '8888008888'] },
+  o_m_rainbow: { name: '무지개 스웨터', price: 5500, rows: ['bbbbbbbbbb', '3333333333', '6666666666', '9999999999', '8888888888', 'cccc00cccc', 'cccc00cccc'] },
+  o_m_frog: { name: '개구리 우비', price: 4000, rows: ['9929999299', '99c9999c99', '9999999999', '9999669999', '9999999999', '6666006666', '6666006666'] },
+  o_m_cloud: { name: '구름 잠옷', price: 3500, rows: ['8888888888', '8228888228', '2222882222', '8888888888', '8822288888', '8888008822', '2288008888'] },
+  o_m_kitty: { name: '고양이 후드', price: 4500, rows: ['1dddddddd1', 'dddddddddd', 'ddd5555ddd', 'dddddddddd', 'dddddddddd', 'cccc00cccc', 'cccc00cccc'] }
+};
+for (const [k, o] of Object.entries(MERCHANT_OUTFITS)) OUTFITS[k] = { name: o.name, price: o.price, pat: o.rows.join(''), merchant: true };
+MERCHANT_POOL.push(...Object.keys(MERCHANT_OUTFITS));
+MERCHANT_FURN.slice(12).forEach(([k]) => MERCHANT_POOL.push(k));
+const MERCHANT_COUNT = 5;
 
 /* 곤충 */
 let nightFlag = false;
@@ -5955,8 +6000,8 @@ function drawFurn(f, it) {
   ctx.save(); ctx.translate(cx, by - 15);
   if (rot) ctx.rotate(rot);
   if (f.f) ctx.scale(-1, 1);
-  ctx.font = '28px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#000000';
-  ctx.fillText(it.icon, 0, 1);
+  if (PXS['fu_' + f.k]) drawSpr(ctx, 'fu_' + f.k, 0, 14, 2);
+  else { ctx.font = '28px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#000000'; ctx.fillText(it.icon, 0, 1); }
   ctx.restore();
 }
 function drawHouseScene(now, dt) {
